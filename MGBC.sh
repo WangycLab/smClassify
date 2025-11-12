@@ -18,9 +18,7 @@ process_sample() {
         mkdir $p/$sample/clean_data
 
         for file in /public/home/wangycgroup/xinlong/mouse_colon/03.Add_cecum/${sample}/clean_data/*; do
-            # 检查是否是 .gz 文件
             if [[ "$file" == *.gz ]]; then
-                # 解压文件
                 echo "Decompressing $file..."
                 /public/home/wangycgroup/public/software/pigz-2.7/unpigz "$file"
             fi
