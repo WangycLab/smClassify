@@ -130,7 +130,7 @@ process_mapping() {
 # Main process
 for sample in "${samples[@]}"; do
     # First stage: Sequence filtering
-    #process_sample "$sample"
+    process_sample "$sample"
     
     # Second stage: Mapping and quantification
     process_mapping "$sample"
