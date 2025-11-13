@@ -110,8 +110,8 @@ for sample in "${samples[@]}"; do
     /public/home/wangycgroup/public/software/pigz-2.7/pigz -p 8 /public/home/wangycgroup/xinlong/mouse_colon/03.Add_cecum/${sample}/clean_data/${sample}_1.fq
     /public/home/wangycgroup/public/software/pigz-2.7/pigz -p 8 /public/home/wangycgroup/xinlong/mouse_colon/03.Add_cecum/${sample}/clean_data/${sample}_2.fq
     /public/home/wangycgroup/public/software/pigz-2.7/pigz -p 8 /public/home/wangycgroup/xinlong/mouse_colon/03.Add_cecum/${sample}/clean_data/*pre_*.fq
-    /public/home/wangycgroup/public/software/pigz-2.7/pigz -p 8 /public/home/wangycgroup/xinlong/mouse_colon/05.Refseq/${sample}/${sample}_Solo.out/GeneFull/filtered/*
-    /public/home/wangycgroup/public/software/pigz-2.7/pigz -p 8 /public/home/wangycgroup/xinlong/mouse_colon/05.Refseq/${sample}/${sample}_Solo.out/GeneFull/raw/*  
+    gzip /public/home/wangycgroup/xinlong/mouse_colon/05.Refseq/${sample}/${sample}_Solo.out/GeneFull/filtered/*
+    gzip /public/home/wangycgroup/xinlong/mouse_colon/05.Refseq/${sample}/${sample}_Solo.out/GeneFull/raw/*  
 done
 
 echo "All tasks completed!"
