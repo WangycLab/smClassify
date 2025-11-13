@@ -12,11 +12,11 @@ samples=("241224-XGR-D71JC" "241224-XGR-D71MC" "241224-XGR-D72JC" "241224-XGR-D7
 python process_gtf.py
 
 # mask ncRNA region of genome
-bedtools maskfasta -fi M1_selected_genome.fna -bed M1_selected_ncRNA.gtf -fo M1_ncRNA_masked.fasta
+bedtools maskfasta -fi M1_genome.fna -bed M1_genome_all_ncRNA.gtf -fo M1_ncRNA_masked.fasta
 
 
-/public/home/wangycgroup/public/software/bin/STAR --runThreadN $THREADS --runMode genomeGenerate --genomeDir ./selected_cds_nocdhit \
- --genomeFastaFiles ./M1_ncRNA_masked.fasta --sjdbGTFfile M1_selected_no_ncRNA.gtf --sjdbOverhang 122 --sjdbGTFfeatureExon gene \
+/public/home/wangycgroup/public/software/bin/STAR --runThreadN $THREADS --runMode genomeGenerate --genomeDir ./M1_all \
+ --genomeFastaFiles ./M1_ncRNA_masked.fasta --sjdbGTFfile M1_genome_all.cds.gtf --sjdbOverhang 122 --sjdbGTFfeatureExon gene \
  --sjdbGTFtagExonParentTranscript ID --sjdbGTFtagExonParentGene ID --genomeSAindexNbases 10 --limitGenomeGenerateRAM=286034755850
 
 
