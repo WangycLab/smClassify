@@ -147,8 +147,8 @@ for sample in "${samples[@]}"; do
     rm ${sample}/Result/${sample}_kraken.output
     /public/home/wangycgroup/public/software/pigz-2.7/pigz -p 8 ${sample}/clean_data/${sample}_1.fq
     /public/home/wangycgroup/public/software/pigz-2.7/pigz -p 8 ${sample}/clean_data/${sample}_2.fq
-    /public/home/wangycgroup/public/software/pigz-2.7/pigz /public/home/wangycgroup/xinlong/mouse_colon/03.Add_cecum/${sample}/${sample}_combine_name_Solo.out/GeneFull/filtered/*
-    /public/home/wangycgroup/public/software/pigz-2.7/pigz /public/home/wangycgroup/xinlong/mouse_colon/03.Add_cecum/${sample}/${sample}_combine_name_Solo.out/GeneFull/raw/*  
+    gzip /public/home/wangycgroup/xinlong/mouse_colon/03.Add_cecum/${sample}/${sample}_Solo.out/GeneFull/filtered/*
+    gzip /public/home/wangycgroup/xinlong/mouse_colon/03.Add_cecum/${sample}/${sample}_Solo.out/GeneFull/raw/*  
 done
 
 echo "All tasks completed!"
