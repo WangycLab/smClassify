@@ -1,0 +1,791 @@
+# ============================================================
+# smClassify-Mouse microbiome single-cell species assignment pipeline
+#
+# This script performs:
+#   1) Non–rRNA-based prefiltering of microbial barcodes.
+#   2) Per-barcode species calling using an MGnify / RefSeq crosswalk.
+#   3) Taxonomic annotation (Domain–Phylum–Class–Order–Family–Genus).
+#   4) QC summaries and visualization (UMI, genes, margins, doublets, composition).
+#
+# Expected inputs (under project_dir/input):
+#   - Raw_mouse_microbial_sce.rds
+#       Seurat object with counts in assay "RNA".
+#   - mouse_annot_feature_attributes_rrna_flags.csv
+#       Feature-level table with rRNA / tmRNA flags or product descriptions.
+#   - mouse_taxonomy_crosswalk_mgnify_refseq.csv
+#       Crosswalk linking MGYG genome IDs to species and higher taxonomy.
+#
+# Outputs (written to project_dir/output):
+#   - barcode_species_calls.csv
+#       Per-barcode species calls and QC metrics.
+#   - sce_bac_annotated.rds
+#       Seurat object with species and taxonomy in metadata.
+#   - QC_report_nature_style.pdf, raw_umi_raw_gene.pdf
+#       QC plots for UMI, genes, species calls, margins, and composition.
+#
+# Usage:
+#   1) Set project_dir below to your project root.
+#   2) Place all required input files in project_dir/input.
+#   3) Source this script in R or run with Rscript.
+# ============================================================
+
+suppressPackageStartupMessages({
+  library(data.table)
+  library(Seurat)
+  library(Matrix)
+  library(dplyr)
+  library(ggplot2)
+  library(forcats)
+  library(scales)
+  library(tidyr)
+})
+
+# ============================================================
+# Paths for GitHub version
+# ============================================================
+project_dir <- "path/to/project_root"  # <-- modify this for your environment
+
+input_dir   <- file.path(project_dir, "input")
+output_dir  <- file.path(project_dir, "output")
+
+dir.create(input_dir,  showWarnings = FALSE, recursive = TRUE)
+dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+
+sce_path       <- file.path(input_dir,  "Raw_mouse_microbial_sce.rds")
+attr_csv       <- file.path(input_dir,  "mouse_annot_feature_attributes_rrna_flags.csv")
+cw_csv         <- file.path(input_dir,  "mouse_taxonomy_crosswalk_mgnify_refseq.csv")
+out_calls_csv  <- file.path(output_dir, "barcode_species_calls.csv")
+
+# ============================================================
+# Common utilities
+# ============================================================
+.blankish <- function(x){
+  # Return TRUE for NA/empty/whitespace-only strings
+  x <- as.character(x); x[is.na(x)] <- ""; !nzchar(trimws(x))
+}
+.norm_id  <- function(x){
+  # Upper-case and replace underscores with dashes (consistent ID style)
+  toupper(gsub("_","-", as.character(x), fixed = TRUE))
+}
+.get_mgyg <- function(x){
+  # Extract MGYG identifiers (MGYG####) from strings
+  x2 <- toupper(as.character(x))
+  m  <- regexpr("MGYG[_-]?[0-9]+", x2, perl = TRUE)
+  ans <- ifelse(m > 0, regmatches(x2, m), NA_character_)
+  gsub("MGYG[_-]([0-9]+)", "MGYG\\1", ans, perl = TRUE)  # normalize to MGYG<digits>
+}
+.norm_mgyg <- function(x){
+  # Normalize MGYG identifiers: MGYG-#### or MGYG_#### -> MGYG####
+  toupper(gsub("^\\s*(MGYG)[_-]?(\\d+)\\s*$", "\\1\\2", as.character(x), perl = TRUE))
+}
+
+# Low-information species name patterns
+LOW_PAT_GENERAL <- "^\\s*([A-Za-z0-9_\\-]+)\\s+sp\\.?\\s*\\d*\\s*$"
+GENUS_SP_UPPER  <- "^\\s*([A-Z0-9-]+)\\s+sp\\.?\\s*\\d*\\s*$"
+
+# ============================================================
+# Build rRNA / tmRNA gene set
+# ============================================================
+build_rrna_set <- function(attr_df) {
+  if ("is_rRNA" %in% names(attr_df) || "is_tmRNA" %in% names(attr_df)) {
+    isR <- if ("is_rRNA" %in% names(attr_df)) (attr_df$is_rRNA %in% TRUE) else FALSE
+    isT <- if ("is_tmRNA" %in% names(attr_df)) (attr_df$is_tmRNA %in% TRUE) else FALSE
+    ids <- unique(na.omit(as.character(attr_df$locus_tag[isR | isT])))
+    return(.norm_id(ids))
+  }
+  # Fallback: detect rRNA / tmRNA by product annotation (case-insensitive)
+  prod <- as.character(attr_df$product)
+  mask <- (!is.na(prod)) &
+    (grepl("(?i)(ribosomal\\s*RNA|\\b[0-9]+S\\s*rRNA\\b|RNASE\\s*P\\s*RNA)", prod, perl=TRUE) |
+       grepl("(?i)\\btmRNA\\b|transfer-messenger\\s*RNA", prod, perl=TRUE)) &
+    (!grepl("(?i)\\btRNA\\b|riboswitch", prod, perl=TRUE))
+  .norm_id(unique(na.omit(as.character(attr_df$locus_tag[mask]))))
+}
+
+# ============================================================
+# MGnify/RefSeq species reconciliation
+# ============================================================
+finalize_species_mgnify_logic <- function(cw) {
+  stopifnot(is.data.frame(cw))
+  cw <- as.data.table(cw)
+  
+  # Normalize column names
+  ln <- tolower(names(cw))
+  ln <- sub("^refseq[ ._]?species$", "refseq.species", ln)
+  names(cw) <- ln
+  if (!"mgnify_species" %in% names(cw)) cw[, mgnify_species := NA_character_]
+  if (!"refseq.species" %in% names(cw)) cw[, `refseq.species` := NA_character_]
+  
+  mg <- cw[["mgnify_species"]]
+  rf <- cw[["refseq.species"]]
+  mg_blank <- .blankish(mg)
+  rf_blank <- .blankish(rf)
+  
+  GENUS_SP_DOT <- "^\\s*([A-Za-z0-9_-]+)\\s+sp\\.$"       # "Genus sp."
+  GENUS_SP_NUM <- "^\\s*([A-Za-z0-9_-]+)\\s+sp[0-9]+$"    # "Genus sp1234"
+  mg_is_spdot <- !mg_blank & grepl(GENUS_SP_DOT, mg, perl = TRUE)
+  mg_is_spnum <- !mg_blank & grepl(GENUS_SP_NUM, mg, perl = TRUE)
+  rf_low <- !rf_blank & (grepl(GENUS_SP_DOT, rf, perl = TRUE) | grepl(GENUS_SP_NUM, rf, perl = TRUE))
+  
+  get_genus <- function(x, pat) sub(pat, "\\1", x, perl = TRUE)
+  genus_allcaps <- function(genus) grepl("^[A-Z0-9-]+$", genus)
+  
+  # Default: use MGnify when present
+  chosen <- mg
+  reason <- ifelse(mg_blank, "MGnify_blank", "MGnify_used")
+  
+  # (1) If MGnify is blank, try RefSeq (must not be low quality); else mark Unknown
+  use_ref_blank <- mg_blank & !rf_blank & !rf_low
+  chosen[use_ref_blank] <- rf[use_ref_blank]
+  reason[use_ref_blank] <- "Use_RefSeq_due_to_MGnify_blank"
+  
+  # (2) If MGnify is "Genus sp.", prefer RefSeq when available; else rewrite as "Uncultured Genus"
+  if (any(mg_is_spdot, na.rm = TRUE)) {
+    use_ref <- mg_is_spdot & !rf_blank & !rf_low
+    chosen[use_ref] <- rf[use_ref]
+    reason[use_ref] <- "Use_RefSeq_due_to_MGnify_spdot"
+    
+    still_sp <- mg_is_spdot & (rf_blank | rf_low | .blankish(rf))
+    if (any(still_sp, na.rm = TRUE)) {
+      genus_tok <- get_genus(mg[still_sp], GENUS_SP_DOT)
+      chosen[still_sp] <- paste0("Uncultured ", genus_tok)
+      reason[still_sp] <- "MGnify_spdot_rewritten_to_Uncultured_Genus"
+    }
+  }
+  
+  # (3) If MGnify is "Genus sp1234", prefer RefSeq when available;
+  #     else keep MGnify unless genus token is ALLCAPS, then rewrite to "Uncultured Genus"
+  if (any(mg_is_spnum, na.rm = TRUE)) {
+    use_ref <- mg_is_spnum & !rf_blank & !rf_low
+    chosen[use_ref] <- rf[use_ref]
+    reason[use_ref] <- "Use_RefSeq_due_to_MGnify_spnum"
+    
+    still_sp <- mg_is_spnum & (rf_blank | rf_low | .blankish(rf))
+    if (any(still_sp, na.rm = TRUE)) {
+      genus_tok <- get_genus(mg[still_sp], GENUS_SP_NUM)
+      is_allcaps <- genus_allcaps(genus_tok)
+      chosen[still_sp] <- ifelse(is_allcaps, paste0("Uncultured ", genus_tok), mg[still_sp])
+      reason[still_sp] <- ifelse(is_allcaps,
+                                 "MGnify_spnum_allcaps_rewritten_to_Uncultured_Genus",
+                                 "Keep_MGnify_spnum")
+    }
+  }
+  
+  # Fallback
+  chosen[.blankish(chosen)] <- "Unknown sp."
+  
+  cw[, Species := chosen]
+  cw[, Species_reason := reason]
+  cw
+}
+
+# ============================================================
+# Prefilter cells using non-rRNA evidence
+# ============================================================
+bacterial_prefilter <- function(
+    sce, attr_df,
+    assay = "RNA", slot = "counts",
+    min_nonrRNA_count    = 100,
+    min_nonrRNA_features = 30,
+    max_rrna_frac        = 0.95,
+    verbose = TRUE
+){
+  t0 <- proc.time()[3]
+  stopifnot(inherits(sce, "Seurat"))
+  if (verbose) message("[prefilter] Reading assay=", assay, " slot=", slot)
+  M <- Seurat::GetAssayData(sce, assay = assay, slot = slot)
+  if (!inherits(M, "dgCMatrix")) M <- as(M, "dgCMatrix")
+  
+  if (verbose) {
+    message(sprintf("[prefilter] Raw matrix: %d genes x %d cells; density=%.4f",
+                    nrow(M), ncol(M),
+                    Matrix::nnzero(M) / as.double(nrow(M)) / as.double(ncol(M))))
+  }
+  
+  rrna_ids <- build_rrna_set(attr_df)
+  if (verbose) message(sprintf("[prefilter] rRNA/tmRNA set size: %d", length(rrna_ids)))
+  
+  rrna_mask <- rownames(M) %in% rrna_ids
+  M_rrna <- if (any(rrna_mask)) M[rrna_mask,, drop = FALSE] else M[0,, drop = FALSE]
+  M_non  <- if (any(rrna_mask)) M[!rrna_mask,, drop = FALSE] else M
+  
+  if (verbose) {
+    message(sprintf("[prefilter] Non-rRNA matrix: %d x %d; nnz=%d",
+                    nrow(M_non), ncol(M_non), Matrix::nnzero(M_non)))
+  }
+  
+  total_umi      <- Matrix::colSums(M)
+  nonr_umi       <- Matrix::colSums(M_non)
+  nonr_features  <- Matrix::colSums(sign(M_non))
+  rrna_fraction  <- if (nrow(M_rrna) > 0) Matrix::colSums(M_rrna) / pmax(1, total_umi) else rep(0, ncol(M))
+  
+  qc <- data.frame(
+    total_umi     = as.numeric(total_umi),
+    nonr_umi      = as.numeric(nonr_umi),
+    nonr_features = as.numeric(nonr_features),
+    rRNA_fraction = as.numeric(rrna_fraction),
+    row.names = colnames(sce)
+  )
+  sce <- Seurat::AddMetaData(sce, metadata = qc)
+  
+  pass <- (nonr_umi >= min_nonrRNA_count) &
+    (nonr_features >= min_nonrRNA_features) &
+    (rrna_fraction <= max_rrna_frac)
+  
+  sce$BacPrefilterPass <- pass
+  sce_filt <- subset(sce, cells = colnames(sce)[pass])
+  
+  kept <- sum(pass); allc <- length(pass)
+  if (verbose) {
+    message(sprintf("[prefilter] Passed: %d / %d cells (%.1f%%)", kept, allc, 100*kept/allc))
+    message(sprintf("[prefilter] Elapsed %.2f s", proc.time()[3] - t0))
+  }
+  list(sce = sce_filt, qc = qc)
+}
+
+# ============================================================
+# Assign species per barcode
+# ============================================================
+assign_species_per_barcode <- function(
+    sce, attr_df, crosswalk,
+    assay = "RNA", slot = "counts",
+    min_nonrRNA_count = 100,
+    min_support_counts = 50,
+    min_frac = 0.6,
+    min_margin = 0.2,
+    write_tax_to_meta = TRUE,
+    verbose = TRUE
+){
+  t0 <- proc.time()[3]
+  stopifnot(inherits(sce, "Seurat"))
+  if (verbose) message("[assign] Reading assay=", assay, " slot=", slot)
+  
+  M <- Seurat::GetAssayData(sce, assay = assay, slot = slot)
+  if (!inherits(M, "dgCMatrix")) M <- as(M, "dgCMatrix")
+  rownames(M) <- .norm_id(rownames(M))
+  
+  if (verbose) {
+    message(sprintf("[assign] Raw matrix: %d x %d; nnz=%d",
+                    nrow(M), ncol(M), Matrix::nnzero(M)))
+  }
+  
+  total_umi <- Matrix::colSums(M)
+  
+  # Remove rRNA
+  if (verbose) message("[assign] Splitting rRNA vs. non-rRNA")
+  rrna_ids <- build_rrna_set(attr_df)
+  rrna_mask <- rownames(M) %in% rrna_ids
+  M_rrna <- if (any(rrna_mask)) M[rrna_mask,,drop=FALSE] else M[0,,drop=FALSE]
+  M_non  <- if (any(rrna_mask)) M[!rrna_mask,,drop=FALSE] else M
+  if (nrow(M_non) == 0) stop("No usable non-rRNA features.")
+  
+  rrna_fraction <- if (nrow(M_rrna) > 0) Matrix::colSums(M_rrna) / pmax(1, total_umi) else rep(0, ncol(M))
+  nonr_total <- Matrix::colSums(M_non)
+  
+  if (verbose) {
+    message(sprintf("[assign] Non-rRNA matrix: %d x %d; nnz=%d",
+                    nrow(M_non), ncol(M_non), Matrix::nnzero(M_non)))
+  }
+  
+  # Map features to MGYG IDs
+  if (verbose) message("[assign] Parsing MGYG ids from feature names")
+  gene_mgyg <- .norm_mgyg(.get_mgyg(rownames(M_non)))
+  
+  # Prepare crosswalk (species & ranks)
+  if (verbose) message("[assign] Normalizing crosswalk; mapping MGYG -> species")
+  cw_low <- as.data.frame(crosswalk, check.names = FALSE)
+  names(cw_low) <- tolower(names(cw_low))
+  if (!"species" %in% names(cw_low)) {
+    if ("mgnify_species" %in% names(cw_low)) cw_low$species <- cw_low$mgnify_species
+    else if ("refseq.species" %in% names(cw_low)) cw_low$species <- cw_low$`refseq.species`
+    else stop("Crosswalk lacks species column.")
+  }
+  if (!"genome" %in% names(cw_low)) stop("Crosswalk must include 'Genome'/'genome'.")
+  cw_low$genome <- .norm_mgyg(cw_low$genome)
+  
+  mgyg2sp <- setNames(as.character(cw_low$species), cw_low$genome)
+  species_for_gene <- unname(mgyg2sp[gene_mgyg])
+  
+  keep <- !is.na(species_for_gene) & species_for_gene != ""
+  M_map <- M_non[keep,,drop=FALSE]
+  sp_for_gene <- species_for_gene[keep]
+  mgyg_non    <- gene_mgyg[keep]
+  if (nrow(M_map) == 0) stop("No non-rRNA features can be mapped to species.")
+  
+  # Prepare taxonomy rank lookups
+  rank_keys <- c("Domain","Phylum","Class","Order","Family","Genus")
+  rk_low <- tolower(rank_keys)
+  need_cols <- c("genome", rk_low)
+  if (!all(need_cols %in% names(cw_low))) {
+    stop("Crosswalk must include: Genome + ", paste(rank_keys, collapse=", "))
+  }
+  mgyg2rank <- setNames(vector("list", length(rank_keys)), rank_keys)
+  for (i in seq_along(rank_keys)) {
+    rk <- rk_low[i]
+    mgyg2rank[[i]] <- setNames(as.character(cw_low[[rk]]), cw_low$genome)
+  }
+  names(mgyg2rank) <- rank_keys
+  
+  # Aggregate counts by species via sparse multiplication
+  if (verbose) message("[assign] Computing species-by-cell counts and support gene counts")
+  t_mul <- proc.time()[3]
+  sp_levels <- sort(unique(sp_for_gene))
+  sp_index  <- match(sp_for_gene, sp_levels)
+  P <- sparseMatrix(i = sp_index, j = seq_len(nrow(M_map)), x = 1,
+                    dims = c(length(sp_levels), nrow(M_map)))
+  S <- P %*% M_map           # species x cell counts
+  nzM <- sign(M_map)
+  S_gene_ct <- P %*% nzM     # species x cell (number of supporting genes)
+  if (verbose) {
+    message(sprintf("[assign] Sparse ops done in %.2f s | %d x %d; nnz=%d",
+                    proc.time()[3]-t_mul, nrow(S), ncol(S), Matrix::nnzero(S)))
+  }
+  
+  # Find Top1 / Top2 species per cell (by non-rRNA fraction)
+  if (verbose) message("[assign] Ranking Top1 / Top2 per cell")
+  ST <- as(S, "dgTMatrix")
+  ii <- ST@i + 1L
+  jj <- ST@j + 1L
+  vx <- ST@x
+  frac <- vx / nonr_total[jj]
+  dt <- data.table(j = jj, i = ii, frac = frac, cnt = vx)
+  setkey(dt, j)
+  setorder(dt, j, -frac)
+  dt[, rk := seq_len(.N), by = j]
+  top2 <- dt[rk <= 2L][, rk := NULL]
+  
+  top1 <- top2[, .SD[1], by = j]
+  top2b <- top2[top2[, .I[.N >= 2L], by = j]$V1]
+  top2b <- top2[j %in% top2b$j][, .SD[2], by = j]
+  
+  species_vec <- sp_levels
+  species_top_vec    <- rep(NA_character_, ncol(M))
+  species_second_vec <- rep(NA_character_, ncol(M))
+  top_frac_vec       <- numeric(ncol(M))
+  second_frac_vec    <- numeric(ncol(M))
+  support_cnt_top    <- numeric(ncol(M))
+  support_cnt_second <- numeric(ncol(M))
+  
+  species_top_vec[top1$j] <- species_vec[top1$i]
+  top_frac_vec[top1$j]    <- top1$frac
+  support_cnt_top[top1$j] <- top1$cnt
+  if (nrow(top2b)) {
+    species_second_vec[top2b$j] <- species_vec[top2b$i]
+    second_frac_vec[top2b$j]    <- top2b$frac
+    support_cnt_second[top2b$j] <- top2b$cnt
+  }
+  
+  # Support gene counts for Top1/Top2
+  if (verbose) message("[assign] Getting Top1/Top2 supporting gene counts")
+  SG <- as(S_gene_ct, "dgTMatrix")
+  dtg <- data.table(j = SG@j+1L, i = SG@i+1L, g = as.integer(SG@x))
+  setkey(dtg, j, i)
+  top1_idx <- data.table(j = top1$j, i = top1$i)
+  top1_idx[, g := dtg[top1_idx, on = .(j, i)]$g]
+  top2_idx <- data.table(j = top2b$j, i = top2b$i)
+  top2_idx[, g := dtg[top2_idx, on = .(j, i)]$g]
+  support_genes_top    <- integer(ncol(M)); support_genes_top[top1_idx$j]    <- ifelse(is.na(top1_idx$g), 0L, top1_idx$g)
+  support_genes_second <- integer(ncol(M)); support_genes_second[top2_idx$j] <- ifelse(is.na(top2_idx$g), 0L, top2_idx$g)
+  
+  # Majority vote taxonomy for Top1 species per cell
+  if (verbose) message("[assign] Majority-vote taxonomy (Top1)")
+  nzM2 <- nzM; nzM2@x[] <- 1
+  NZ <- as(nzM2, "dgTMatrix")
+  dt_nz <- data.table(j = NZ@j+1L, gene_row = NZ@i+1L)
+  dt_nz[, sp := sp_index[gene_row]]
+  top1_for_join <- data.table(j = top1$j, sp = top1$i)
+  setkey(dt_nz, j, sp); setkey(top1_for_join, j, sp)
+  dt_top1_genes <- dt_nz[top1_for_join, nomatch = 0L]
+  mgyg_vec <- mgyg_non
+  rank_vals <- vector("list", length(rank_keys)); names(rank_vals) <- rank_keys
+  for (rk in rank_keys) {
+    m <- mgyg2rank[[rk]][mgyg_vec]
+    rank_vals[[rk]] <- m
+  }
+  for (rk in rank_keys) {
+    data.table::set(dt_top1_genes, j = rk, value = rank_vals[[rk]][dt_top1_genes$gene_row])
+  }
+  Mode1 <- function(v) {
+    v <- v[!is.na(v) & nzchar(v)]
+    if (!length(v)) return(NA_character_)
+    tt <- table(v); names(tt)[which.max(tt)]
+  }
+  Tax_Domain <- Tax_Phylum <- Tax_Class <- Tax_Order <- Tax_Family <- Tax_Genus <- rep(NA_character_, ncol(M))
+  if (nrow(dt_top1_genes)) {
+    Tax_tbl <- dt_top1_genes[, .(
+      Tax_Domain = Mode1(Domain),
+      Tax_Phylum = Mode1(Phylum),
+      Tax_Class  = Mode1(Class),
+      Tax_Order  = Mode1(Order),
+      Tax_Family = Mode1(Family),
+      Tax_Genus  = Mode1(Genus)
+    ), by = j]
+    Tax_Domain[Tax_tbl$j] <- Tax_tbl$Tax_Domain
+    Tax_Phylum[Tax_tbl$j] <- Tax_tbl$Tax_Phylum
+    Tax_Class[Tax_tbl$j]  <- Tax_tbl$Tax_Class
+    Tax_Order[Tax_tbl$j]  <- Tax_tbl$Tax_Order
+    Tax_Family[Tax_tbl$j] <- Tax_tbl$Tax_Family
+    Tax_Genus[Tax_tbl$j]  <- Tax_tbl$Tax_Genus
+  }
+  
+  # Determine pass / putative doublet by margin rule
+  margin12 <- top_frac_vec - second_frac_vec
+  pass <- (!is.na(species_top_vec)) &
+    (nonr_total >= min_nonrRNA_count) &
+    (support_cnt_top >= min_support_counts) &
+    (top_frac_vec >= min_frac) &
+    (margin12 >= min_margin)
+  doublet_candidate <- (!is.na(species_second_vec)) &
+    (nonr_total >= min_nonrRNA_count) &
+    (support_cnt_top >= min_support_counts) &
+    (top_frac_vec >= min_frac) &
+    (margin12 < (2 * min_margin))
+  
+  # Output call table
+  calls <- data.table::data.table(
+    barcode            = colnames(M),
+    species            = species_top_vec,
+    SpeciesSecond      = species_second_vec,
+    nonr_total         = as.numeric(nonr_total),
+    total_umi          = as.numeric(total_umi),
+    rRNA_fraction      = as.numeric(rrna_fraction),
+    top_frac           = top_frac_vec,
+    SecondFrac         = second_frac_vec,
+    margin12           = margin12,
+    support_counts     = as.numeric(support_cnt_top),
+    SecondCounts       = as.numeric(support_cnt_second),
+    SupportGenes       = as.integer(support_genes_top),
+    SecondGenes        = as.integer(support_genes_second),
+    pass               = pass,
+    SpeciesDoubletCandidate = doublet_candidate,
+    Tax_Domain = Tax_Domain,
+    Tax_Phylum = Tax_Phylum,
+    Tax_Class  = Tax_Class,
+    Tax_Order  = Tax_Order,
+    Tax_Family = Tax_Family,
+    Tax_Genus  = Tax_Genus
+  )
+  
+  if (isTRUE(write_tax_to_meta)) {
+    add_meta <- as.data.frame(calls[, .(species, SpeciesSecond, rRNA_fraction,
+                                        Tax_Domain,Tax_Phylum,Tax_Class,Tax_Order,Tax_Family,Tax_Genus)],
+                              stringsAsFactors = FALSE)
+    rownames(add_meta) <- calls$barcode
+    sce <<- Seurat::AddMetaData(sce, metadata = add_meta)
+  }
+  
+  if (verbose) message(sprintf("[assign] Done in %.2f s", proc.time()[3] - t0))
+  list(species_counts = S, calls = calls)
+}
+
+# ============================================================
+# Orchestrated pipeline
+# ============================================================
+t_all <- proc.time()[3]
+message("[main] Starting pipeline ...")
+
+# Load inputs
+message("[main] Loading Seurat object and attribute table ...")
+sce <- readRDS(sce_path)
+attr_df <- fread(attr_csv, check.names = FALSE)
+
+# 1) Prefilter (non-rRNA evidence)
+pf <- bacterial_prefilter(
+  sce, attr_df,
+  min_nonrRNA_count = 100,
+  min_nonrRNA_features = 30,
+  max_rrna_frac = 0.95,
+  verbose = TRUE
+)
+sce_bac <- pf$sce
+
+# 2) Read crosswalk and apply species name logic
+message("[main] Reading crosswalk and applying naming rules ...")
+cw_raw  <- fread(cw_csv, check.names = FALSE)
+if (!any(tolower(names(cw_raw)) == "genome")) stop("crosswalk must include 'Genome'")
+names(cw_raw)[tolower(names(cw_raw)) == "genome"] <- "Genome"
+cw <- finalize_species_mgnify_logic(cw_raw)
+
+# Mapping sanity checks
+M_tmp <- Seurat::GetAssayData(sce_bac, assay = "RNA", slot = "counts")
+if (!inherits(M_tmp, "dgCMatrix")) M_tmp <- as(M_tmp, "dgCMatrix")
+cw_keys_norm <- .norm_mgyg(.get_mgyg(as.character(cw$Genome)))
+mgyg2sp <- setNames(
+  as.character(cw$Species)[!is.na(cw_keys_norm)],
+  cw_keys_norm[!is.na(cw_keys_norm)]
+)
+mg_from_rows <- .norm_mgyg(.get_mgyg(rownames(M_tmp)))
+message(sprintf("[main] Proportion of non-rRNA genes mappable to species: %.1f%%",
+                100 * mean(!is.na(mgyg2sp[mg_from_rows]))))
+rrna_ids_now <- build_rrna_set(attr_df)
+message(sprintf("[main] rRNA feature count: %d", length(rrna_ids_now)))
+message(sprintf("[main] Proportion of rownames containing MGYG id: %.1f%%",
+                100*mean(!is.na(mg_from_rows))))
+message("[main] Note: these statistics reflect non-rRNA UMI only (including unmapped).")
+
+# 3) Assign species per barcode
+res <- assign_species_per_barcode(
+  sce_bac, attr_df, cw,
+  min_nonrRNA_count = 100,
+  min_support_counts = 50,
+  min_frac = 0.6,
+  min_margin = 0.2,
+  write_tax_to_meta = TRUE,
+  verbose = TRUE
+)
+
+# 4) Save call table
+fwrite(res$calls, out_calls_csv, bom = TRUE)
+message("[main] Species calls written to: ", out_calls_csv)
+
+# 5) Quick preview
+print(head(res$calls[order(-top_frac)]))
+message(sprintf("[main] Pipeline complete; elapsed %.2f s", proc.time()[3] - t_all))
+
+# ============================================================
+# Attach species calls back to Seurat object and save
+# ============================================================
+cols_to_write <- c(
+  "species","SpeciesSecond","pass","SpeciesDoubletCandidate",
+  "rRNA_fraction","nonr_total","total_umi",
+  "top_frac","SecondFrac","margin12",
+  "support_counts","SecondCounts","SupportGenes","SecondGenes",
+  "Tax_Domain","Tax_Phylum","Tax_Class","Tax_Order","Tax_Family","Tax_Genus"
+)
+
+md <- as.data.frame(res$calls[, cols_to_write, with = FALSE])
+rownames(md) <- res$calls$barcode
+
+sce_bac_annot <- Seurat::AddMetaData(sce_bac, metadata = md)
+Seurat::Idents(sce_bac_annot) <- "species"
+
+saveRDS(sce_bac_annot, file = file.path(output_dir, "sce_bac_annotated.rds"))
+message("[main] Annotated Seurat object saved: ", file.path(output_dir, "sce_bac_annotated.rds"))
+
+# Minimal checks
+table(sce_bac_annot$pass, useNA = "ifany")[]
+head(sce_bac_annot@meta.data[, c("species","Tax_Genus","top_frac")])
+
+# ============================================================
+# QC data tables for plotting
+# ============================================================
+M_raw <- Seurat::GetAssayData(sce, assay = "RNA", slot = "counts")
+if (!inherits(M_raw, "dgCMatrix")) M_raw <- as(M_raw, "dgCMatrix")
+
+raw_qc <- data.frame(
+  barcode     = colnames(M_raw),
+  total_umi   = Matrix::colSums(M_raw),
+  gene_count  = Matrix::colSums(sign(M_raw)),
+  orig.ident  = if ("orig.ident" %in% colnames(sce@meta.data)) sce$orig.ident else "(batch)",
+  loc         = if ("loc" %in% colnames(sce@meta.data)) sce$loc else "(all)"
+)
+
+meta_df <- sce_bac@meta.data %>%
+  tibble::rownames_to_column("barcode") %>%
+  mutate(
+    orig.ident = if (!"orig.ident" %in% names(.)) "(batch)" else orig.ident,
+    loc        = if (!"loc"        %in% names(.)) "(all)"   else loc
+  )
+
+res_calls <- res$calls %>%
+  left_join(meta_df[, c("barcode","orig.ident","loc","rRNA_fraction")], by = "barcode") %>%
+  mutate(
+    pass = factor(pass, levels = c(FALSE, TRUE), labels = c("Fail","Pass")),
+    SpeciesDoubletCandidate = factor(SpeciesDoubletCandidate, levels = c(FALSE, TRUE),
+                                     labels = c("Singlet","Doublet"))
+  )
+
+# ============================================================
+# QC plots
+# ============================================================
+theme_nature <- function(base_size = 11) {
+  theme_classic(base_size = base_size) %+replace%
+    theme(
+      axis.line   = element_line(linewidth = 0.5, colour = "black"),
+      axis.ticks  = element_line(linewidth = 0.4, colour = "black"),
+      axis.title  = element_text(size = base_size),
+      axis.text   = element_text(size = base_size - 1, colour = "black"),
+      plot.title  = element_text(face = "bold", hjust = 0, size = base_size + 1),
+      legend.title= element_text(size = base_size),
+      legend.text = element_text(size = base_size - 1),
+      strip.background = element_blank(),
+      strip.text = element_text(face = "bold", colour = "black"),
+      panel.border = element_rect(fill = NA, colour = "black", linewidth = 0.5),
+      plot.margin = margin(6,6,6,6)
+    )
+}
+
+cell_type_cols <- c(
+  "#1F77B4",  "#2CA02C","#FF7F0E","#6A5ACD", "#8C564B", "#E377C2", "#7F7F7F", 
+  "#BCBD22", "#17BECF", "#F5A0A1", "#C2B5D8", "#FFB6C1", "#3CB371", "#9ACD32",
+  "#8B0000",  "#FFD700", "#DC143C", "#228B22", "#FF6347", "#483D8B", "#BDB76B", 
+  "#20B2AA", "#FF1493", "#FF4500", "#32CD32", "#3E8E41", "#20B2AA"
+)
+okabe_ito <- c("#000000","#E69F00","#56B4E9","#009E73",
+               "#F0E442","#0072B2","#D55E00","#CC79A7","#999999")
+
+# Plot 1: Raw total UMI per cell
+p_raw_umi <- ggplot(raw_qc, aes(x = orig.ident, fill = orig.ident, y = total_umi)) +
+  geom_violin(colour = "black", linewidth = 0.3) +
+  geom_boxplot(width = 0.15, outlier.size = 0.5) +
+  scale_y_log10() +
+  labs(title = "Rawdata: UMI counts per cell", y = "Total UMI (log10)", x = NULL) +
+  theme_nature() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = cell_type_cols)
+
+# Plot 2: Raw detected genes per cell
+p_raw_gene <- ggplot(raw_qc, aes(x = orig.ident, fill = orig.ident, y = gene_count)) +
+  geom_violin(colour = "black", linewidth = 0.3) +
+  geom_boxplot(width = 0.15, outlier.size = 0.5) +
+  scale_y_log10() +
+  labs(title = "Rawdata: Gene counts per cell", y = "Detected genes (log10)", x = NULL) +
+  theme_nature() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = cell_type_cols)
+
+# Plot 3: Species assignment success rate per sample
+p_success <- ggplot(res_calls, aes(x = orig.ident, fill = pass)) +
+  geom_bar(position = "fill", colour = "black", linewidth = 0.2) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = okabe_ito[c(6,3)]) +
+  labs(title = "Species assignment success rate", y = "Fraction", x = NULL, fill = "Call") +
+  theme_nature() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot 4: Margin (Top1 - Top2) distribution
+p_margin <- ggplot(res_calls, aes(x = margin12)) +
+  geom_histogram(bins = 60, fill = "grey75", colour = "black") +
+  geom_vline(xintercept = 0.2, linetype = "dashed") +
+  labs(title = "Confidence margin (Top1 - Top2)", x = "Margin12", y = "Cells") +
+  theme_nature()
+
+# Plot 5: Putative doublet fraction
+p_doublet <- ggplot(res_calls, aes(x = orig.ident, fill = SpeciesDoubletCandidate)) +
+  geom_bar(position = "fill", colour = "black", linewidth = 0.2) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = okabe_ito[c(2,7)]) +
+  labs(title = "Putative doublet fraction", y = "Fraction", x = NULL, fill = NULL) +
+  theme_nature() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot 6: Top-20 species composition per loc x sample
+species_tbl <- table(res_calls$species)
+species_tbl <- species_tbl[!is.na(names(species_tbl))]
+top_k <- min(20, length(species_tbl))
+top_species <- if (top_k > 0) names(sort(species_tbl, decreasing = TRUE))[1:top_k] else character(0)
+
+comp_species <- res_calls %>%
+  mutate(
+    species_plot = ifelse(is.na(species), "Unknown", species),
+    species_plot = ifelse(species_plot %in% top_species, species_plot, "Others")
+  ) %>%
+  group_by(loc, orig.ident, species_plot) %>%
+  summarise(n = n(), .groups = "drop_last") %>%
+  group_by(loc, orig.ident) %>%
+  mutate(frac = n / sum(n)) %>%
+  ungroup()
+
+p_comp <- ggplot(comp_species, aes(x = orig.ident, y = frac, fill = species_plot)) +
+  geom_col(colour = "black", linewidth = 0.2) +
+  scale_y_continuous(labels = scales::percent) +
+  facet_wrap(~loc, scales = "free_x") +
+  labs(title = "Top20 species composition", y = "Composition", x = NULL, fill = "Species") +
+  theme_nature() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# ============================================================
+# Export QC PDFs
+# ============================================================
+pdf(file.path(output_dir, "QC_report_nature_style.pdf"), width = 4, height = 3)
+print(p_margin)
+print(p_doublet)
+print(p_comp)
+dev.off()
+
+pdf(file.path(output_dir, "raw_umi_raw_gene.pdf"), width = 7.2, height = 3)
+print(p_raw_umi)
+print(p_raw_gene)
+dev.off()
+
+fwrite(res$calls, out_calls_csv, bom = TRUE)
+message("[main] QC report saved: ", file.path(output_dir, "QC_report_nature_style.pdf"))
+message("[main] Species calls saved: ", out_calls_csv)
+
+# ============================================================
+# Top-20 Family / Genus / Species composition tables
+# ============================================================
+suppressPackageStartupMessages({
+  library(stringr)
+  library(purrr)
+})
+
+`%||%` <- function(x, y) if (is.null(x)) y else x
+
+if (!exists("cell_type_cols", inherits = FALSE)) {
+  cell_type_cols <- c(
+    "#1F77B4","#2CA02C","#FF7F0E","#6A5ACD","#8C564B","#E377C2","#7F7F7F",
+    "#BCBD22","#17BECF","#F5A0A1","#C2B5D8","#FFB6C1","#3CB371","#9ACD32",
+    "#8B0000","#FFD700","#DC143C","#228B22","#FF6347","#483D8B","#BDB76B",
+    "#20B2AA","#FF1493","#FF4500","#32CD32","#3E8E41","#20B2AA"
+  )
+}
+
+# Use Seurat metadata for sample / position
+.meta_src <- if (exists("sce_bac_annot")) sce_bac_annot else sce
+stopifnot(!is.null(.meta_src))
+
+meta_df2 <- .meta_src@meta.data %>%
+  tibble::rownames_to_column("barcode") %>%
+  mutate(
+    sample   = if ("orig.ident" %in% names(.)) as.character(orig.ident) else "(batch)",
+    position = if ("loc"        %in% names(.)) as.character(loc)        else "(all)"
+  ) %>%
+  select(barcode, sample, position)
+
+# Merge calls and metadata, and build rank columns
+calls2 <- res$calls %>%
+  left_join(meta_df2, by = "barcode") %>%
+  mutate(
+    Species = ifelse(is.na(species) | species == "", "Unknown", species),
+    Genus   = ifelse(is.na(Tax_Genus)  | Tax_Genus  == "", "Unknown", Tax_Genus),
+    Family  = ifelse(is.na(Tax_Family) | Tax_Family == "", "Unknown", Tax_Family)
+  )
+
+.build_comp_rank <- function(df_calls, rank_col = c("Family","Genus","Species"), topN = 20) {
+  rank_col <- match.arg(rank_col)
+  top_taxa <- df_calls %>%
+    count(!!sym(rank_col), name = "n_tot") %>%
+    arrange(desc(n_tot)) %>%
+    slice_head(n = topN) %>%
+    pull(!!sym(rank_col))
+  
+  comp <- df_calls %>%
+    mutate(taxon = ifelse(.data[[rank_col]] %in% top_taxa, .data[[rank_col]], "Others")) %>%
+    count(position, sample, taxon, name = "n") %>%
+    group_by(position, sample) %>%
+    mutate(Percent = round(100 * n / sum(n), 2)) %>%
+    ungroup() %>%
+    arrange(position, sample, desc(Percent))
+  
+  comp
+}
+
+comp_list <- list(
+  Family  = .build_comp_rank(calls2, "Family",  topN = 5),
+  Genus   = .build_comp_rank(calls2, "Genus",   topN = 10),
+  Species = .build_comp_rank(calls2, "Species", topN = 15)
+)
+
+topN_map <- list(Family = 5, Genus = 10, Species = 15)
+
+# Example: if you have a function plot_rank_nice(), use it here
+# p_family  <- plot_rank_nice(comp_list$Family,  "Family")
+# p_genus   <- plot_rank_nice(comp_list$Genus,   "Genus")
+# p_species <- plot_rank_nice(comp_list$Species, "Species")
+# pdf(file.path(output_dir, "Family_Genus_Species_Top20.pdf"), width = 6, height = 6)
+# print(p_family)
+# print(p_genus)
+# print(p_species)
+# dev.off()
+
