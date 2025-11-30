@@ -48,9 +48,10 @@ suppressPackageStartupMessages({
 # ----------------------------------------------------------------
 set.seed(1234)   # Fix random seed for reproducibility
 
-work_dir <- "D:/BaiduSyncdisk/post-doc/T2DMmicrobiome/mouse_colon/20251009"
-dir.create(work_dir, showWarnings = FALSE, recursive = TRUE)
-setwd(work_dir)
+# Set this to your project root when running the script
+project_dir <- "path/to/project_root"   # <-- modify for your environment
+dir.create(project_dir, showWarnings = FALSE, recursive = TRUE)
+setwd(project_dir)
 
 # A 21-color palette: ggthemes::Classic_20 + black
 color21 <- c(paletteer_d("ggthemes::Classic_20", n = 20), "black")
