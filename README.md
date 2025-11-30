@@ -20,7 +20,7 @@ Batch classification of FASTQ files with the previously described Kraken2-based 
 Parsing, summarizing, and exporting genus-level and species-level reports  
 **Reference genome comparison utilities:**  
 Scripts to evaluate mapping / assignment rates across the three reference sets  
-Scripts to compare database content (genus/species overlap, taxonomic breadth, host specificity)  
+Scripts to compare database content
 FastANI-based genome similarity comparison between reference catalogs  
   
 Each script contains detailed parameters, tool versions, and instructions for execution.  
