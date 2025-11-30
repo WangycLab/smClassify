@@ -13,12 +13,12 @@ Original scripts used in the study are organized within this directory.
 ### 1. `Reference_genome_comparison_and_species_classification/`
 This directory contains all scripts used for benchmarking the three reference genome resources and performing species identification using a Kraken2-based classifier. The included scripts cover:  
 
-**FASTQ preprocessing for taxonomic classification**  
+**FASTQ preprocessing for taxonomic classification:**  
 Read filtering and quality control, Barcode/UMI extraction  
-**Species classification scripts**  
+**Species classification scripts:**  
 Batch classification of FASTQ files with the previously described Kraken2-based workflow  
 Parsing, summarizing, and exporting genus-level and species-level reports  
-**Reference genome comparison utilities**  
+**Reference genome comparison utilities:**  
 Scripts to evaluate mapping / assignment rates across the three reference sets  
 Scripts to compare database content (genus/species overlap, taxonomic breadth, host specificity)  
 FastANI-based genome similarity comparison between reference catalogs  
