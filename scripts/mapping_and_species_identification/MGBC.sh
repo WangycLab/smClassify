@@ -3,13 +3,12 @@
 # Stage 1 (per sample):
 #   - Prepare per-sample working directory
 #   - Link / decompress FASTQ files
-#   - Run scMeta (pre-dedup, dedup, cell calling, Kraken2/Bracken classification)
+#   - Run Kraken2/Bracken classification
 #
 # Stage 2 (per sample):
 #   - Build MGBC-based reference (FASTA + GTF) from classified species list
 #   - Generate STAR index
 #   - Run STARsolo for UMI-aware gene quantification
-#   - Filter and sort gene-cell matrices, generate QC plots
 #
 # All paths below are placeholders and should be customized by the user.
 ###############################################################################
