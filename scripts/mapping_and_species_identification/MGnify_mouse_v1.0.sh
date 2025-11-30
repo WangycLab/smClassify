@@ -42,7 +42,7 @@ ANCHORBCM_BIN="/path/to/anchorbcm"
 ANCHORBCM_PREINDEX="/path/to/prev6v2.msr"
 
 # Kraken2_smClassificaiton / classification (using m-MGnify Mouse Gut v1.0 Kraken DB)
-Kraken2_smClassificaiton_SCRIPT="/path/to/microbiomePipe/Kraken2_smClassificaiton.py"
+Kraken2_smClassificaiton_SCRIPT="/path/to/microbiomePipe/Kraken2-based classification pipline.py"
 NUBEAM_DEDUP_BIN="/path/to/nubeam-dedup"
 KRAKEN_BIN="/path/to/kraken2"
 BRAKEN_BIN="/path/to/est_abundance_bracken"
