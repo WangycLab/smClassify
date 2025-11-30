@@ -34,8 +34,8 @@ PYTHON_BIN="python"   # or absolute path, e.g. /opt/conda/bin/python
 STAR_BIN="STAR"       # or absolute path, e.g. /usr/local/bin/STAR
 PIGZ_BIN="pigz"       # for (re)compression of FASTQ
 
-# scMeta / classification pipeline
-SCMETA_SCRIPT="/path/to/kraken2-based classification pipline.py"
+# Kranken2_smClassification / classification pipeline
+Kranken2_smClassification_SCRIPT="/path/to/kraken2-based classification pipline.py"
 NUBEAM_DEDUP_BIN="/path/to/nubeam-dedup"
 KRAKEN_BIN="/path/to/kraken2"
 BRAKEN_BIN="/path/to/est_abundance_bracken"
@@ -90,8 +90,8 @@ process_sample() {
 
     cd "${sample_dir}"
 
-    # ----------------- scMeta configuration -----------------
-    echo "[INFO] Start scMeta for ${sample}: $(date)"
+    # ----------------- Kranken2_smClassification configuration -----------------
+    echo "[INFO] Start Kranken2_smClassification for ${sample}: $(date)"
 
     cat > config.ini <<EOF
 sample=${sample}
@@ -105,10 +105,10 @@ krakenDb=${KRAKEN_DB_DIR}
 # mode=m20  # optional: barcode mode, e.g. 20 bp cell barcode
 EOF
 
-    # Run scMeta pipeline
-    "${PYTHON_BIN}" "${SCMETA_SCRIPT}" --cfg config.ini
+    # Run Kranken2_smClassification pipeline
+    "${PYTHON_BIN}" "${Kranken2_smClassification_SCRIPT}" --cfg config.ini
 
-    echo "[INFO] scMeta finished for ${sample}: $(date)"
+    echo "[INFO] Kranken2_smClassification finished for ${sample}: $(date)"
     echo
 }
 
