@@ -1,3 +1,4 @@
+# This script generates Figure 2B, 2D
 # Load genome completeness data
 library(cowplot)
 library(tidyverse)
