@@ -73,7 +73,7 @@ out_calls_csv  <- file.path(output_dir, "barcode_species_calls.csv")
   toupper(gsub("^\\s*(MGYG)[_-]?(\\d+)\\s*$", "\\1\\2", as.character(x), perl = TRUE))
 }
 
-# Low-information species name patterns (not used directly here but kept for completeness)
+# Low-information species name patterns
 LOW_PAT_GENERAL <- "^\\s*([A-Za-z0-9_\\-]+)\\s+sp\\.?\\s*\\d*\\s*$"
 GENUS_SP_UPPER  <- "^\\s*([A-Z0-9-]+)\\s+sp\\.?\\s*\\d*\\s*$"
 
@@ -383,6 +383,7 @@ assign_species_per_barcode <- function(
   
   # Majority vote taxonomy for Top1 species per cell
   if (verbose) message("[assign] Majority-vote taxonomy (Top1)")
+  rank_keys <- c("Domain","Phylum","Class","Order","Family","Genus")  # ensure in scope
   nzM2 <- nzM; nzM2@x[] <- 1
   NZ <- as(nzM2, "dgTMatrix")
   dt_nz <- data.table(j = NZ@j+1L, gene_row = NZ@i+1L)
