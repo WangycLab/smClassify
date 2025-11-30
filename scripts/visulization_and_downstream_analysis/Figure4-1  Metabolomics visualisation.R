@@ -33,8 +33,8 @@ suppressPackageStartupMessages({
 setwd("path/to/project_root/Figure4")
 
 # Input Excel files (unchanged names / formats)
-serum_file   <- "serum_norm_ms2_metabolites_intensity.xlsx"
-content_file <- "content_norm_ms2_metabolites_intensity.xlsx"
+serum_file   <- "Metabolomics_Serum.xlsx"
+content_file <- "Metabolomics_CecalContent.xlsx"
 
 # Output folder for all plots / results
 dir.create("plots", showWarnings = FALSE)
