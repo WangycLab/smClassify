@@ -35,7 +35,7 @@ STAR_BIN="STAR"       # or absolute path, e.g. /usr/local/bin/STAR
 PIGZ_BIN="pigz"       # for (re)compression of FASTQ
 
 # Kranken2_smClassification / classification pipeline
-Kranken2_smClassification_SCRIPT="/path/to/kraken2-based classification pipline.py"
+Kranken2_smClassification_SCRIPT="/path/to/Kraken2-based classification pipline.py"
 NUBEAM_DEDUP_BIN="/path/to/nubeam-dedup"
 KRAKEN_BIN="/path/to/kraken2"
 BRAKEN_BIN="/path/to/est_abundance_bracken"
