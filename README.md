@@ -6,38 +6,55 @@ This repository contains the analysis code and data processing pipelines associa
 ## Repository Structure
 
 ### `scripts/`
-Original scripts used in the study are organized within this directory.
+Original scripts used in the study are organized within this directory.  
 
 ---
 
-### 1. `mapping_and_species_identification/`
-This folder contains all scripts used for processing FASTQ files and converting them into gene expression matrix. The workflow includes:
+### 1. `Reference_genome_comparison_and_species_classification/`
+This directory contains all scripts used for benchmarking the three reference genome resources and performing species identification using a Kraken2-based classifier. The included scripts cover:  
 
-- Genome alignment using **STAR**  
-- Filtering, UMI-aware quantification, and matrix generation  
-- Species identification using Kraken2
-
-Parameters and execution details are documented within each script.
+**FASTQ preprocessing for taxonomic classification**  
+Read filtering and quality control, Barcode/UMI extraction  
+**Species classification scripts**  
+Batch classification of FASTQ files with the previously described Kraken2-based workflow  
+Parsing, summarizing, and exporting genus-level and species-level reports  
+**Reference genome comparison utilities**  
+Scripts to evaluate mapping / assignment rates across the three reference sets  
+Scripts to compare database content (genus/species overlap, taxonomic breadth, host specificity)  
+FastANI-based genome similarity comparison between reference catalogs  
+  
+Each script contains detailed parameters, tool versions, and instructions for execution.  
 
 ---
 
-### 2. `downstream_analysis_and_visualization/`
-This folder contains all downstream R scripts used to generate the figures in the manuscript. Each script corresponds directly to a figure or figure panel.
+### 2. `smClassify_and_downstream_analysis/`
+This directory contains all downstream R scripts used to generate the figures in the manuscript. Each script corresponds directly to a specific figure or figure panel.  
 
 #### Included scripts:
 
 **Figure 2**  
-Workflow of smClassify, community composition, comparison of classification performance by different databases.
+smClassify pipeline scripts  
+Community composition summaries  
 
 **Figure 3**  
-Clustering, differential gene expression, KEGG enrichment, functional cluster distribution, species proportion analysis, subcluster exploration.
+ Cell clustering and dimensionality reduction  
+ Differential gene expression analysis  
+ KEGG pathway enrichment  
+ Functional-cluster distribution  
+ Species proportion analysis  
+ Subcluster characterization  
 
 **Figure 4**  
-PLS-DA, differential metabolites, network analysis, KEGG pathway visualization, metabolite-related boxplots and dotplots (amino acids, bile acids, LCFA, PULs).
+ PLS-DA analysis  
+ Differential metabolite analysis  
+ Network construction and visualization  
+ KEGG pathway mapping  
+ Metabolite boxplots and dotplots (amino acids, bile acids, LCFA, PUL-related metabolites)  
 
 **Figure 5**  
-Sample–species correlations, subcluster analysis of *Duncaniella* and *Parabacteroides*, multi-species correlation.
-
+ Analysis of community-embedded functional states  
+ Cross-species functional complementation within the gut microbiota  
+  
 **Figure 6**  
-Pseudotime analysis, subcluster analysis of *Muribaculum*, nitrogen/amino-acid metabolism analysis.
-
+ Subpopulation analysis of *M. gordoncarteri*  
+ Disrupted nitrogen- and stress-response programs linked to host nitrogen imbalance
