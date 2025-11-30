@@ -1,3 +1,5 @@
+# GTF formatting and filtering utility for microbial reference genomes.
+# This script is part of the genome preprocessing pipeline (MGBC/MGnify/RefSeq)
 # Format gtf file
 def convert_gtf(input_file, output_file):
     with open(input_file, 'r') as infile, open(output_file, 'w') as outfile:
@@ -38,8 +40,7 @@ def filter_records(input_file, exclusion_file, included_output, excluded_output)
                     included_file.write(line)
 
 
-
-convert_gtf('/public/home/wangycgroup/xinlong/mouse_colon/genomes/M1_CDS_ncRNA.gtf', 'M1_genome_all.fix.gtf')
+convert_gtf('M1_CDS_ncRNA.gtf', 'M1_genome_all.fix.gtf')
 
 filter_records(
     input_file="M1_genome_all.fix.gtf",
