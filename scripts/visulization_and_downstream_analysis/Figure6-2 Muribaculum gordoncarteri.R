@@ -599,7 +599,6 @@ pheatmap(
 )
 dev.off()
 
-# Note: This keeps the original call using png() with a .pdf filename
 png(filename = "Murigor_monocle3_pheatmap.pdf", width = 4, height = 8)
 
 pheatmap(
