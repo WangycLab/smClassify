@@ -6,8 +6,26 @@ This repository contains the analysis code and data processing pipelines associa
 ## Repository Structure
 
 ### `scripts/`
-Original scripts used in the study are organized within this directory.  
+Original scripts used in the study are organized within this directory. 
+## Input data
 
+Large input files required to run the analysis scripts are available on figshare: DOI: 10.6084/m9.figshare.32685366
+
+
+## Input data
+
+Large input files required to run the analysis scripts are available on figshare:
+
+DOI: 10.6084/m9.figshare.32685366
+
+Please download and extract the corresponding `Figure*_Input` archives into each figure's `Input/` directory before running the scripts.
+## Input data
+
+Large input files required to run the analysis scripts are available on figshare:
+
+DOI: 10.6084/m9.figshare.32685366
+
+Please download and extract the corresponding `Figure*_Input` archives into each figure's `Input/` directory before running the scripts.
 ---
 
 ### 1. `Reference_genome_comparison_and_species_classification/`
