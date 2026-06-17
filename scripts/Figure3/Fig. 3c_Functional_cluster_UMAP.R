@@ -1,23 +1,13 @@
 # ============================================================
 # Figure 3c functional-cluster UMAP
-#
-# This script generates the Figure 3c UMAP embedding of single
-# microbial cells colored by functional cluster identity.
-#
-# Input files:
-#   1. Mouse_bacterial_SCT_clustered_seurat.rds
-#   2. Cluster_functional_annotation.csv
-#
 
 # ============================================================
+library(Seurat)
+library(dplyr)
+library(ggplot2)
+library(tibble)
+library(scales)
 
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(dplyr)
-  library(ggplot2)
-  library(tibble)
-  library(scales)
-})
 
 set.seed(1234)
 
