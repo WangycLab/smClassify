@@ -3,15 +3,14 @@
 # ============================================================
 # 1. Load packages
 # ============================================================
-suppressPackageStartupMessages({
-  library(tidyverse)
-  library(Seurat)
-  library(igraph)
-  library(ggraph)
-  library(scales)
-  library(pheatmap)
-  library(RColorBrewer)
-})
+library(tidyverse)
+library(Seurat)
+library(igraph)
+library(ggraph)
+library(scales)
+library(pheatmap)
+library(RColorBrewer)
+
 
 # ============================================================
 # 2. Input and output paths
