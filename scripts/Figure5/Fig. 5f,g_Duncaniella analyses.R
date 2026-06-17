@@ -5,12 +5,10 @@
 # ============================================================
 # 1. Load packages
 # ============================================================
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(dplyr)
-  library(ggplot2)
-  library(data.table)
-})
+library(Seurat)
+library(dplyr)
+library(ggplot2)
+
 
 # ============================================================
 # 2. Input and output paths
@@ -196,7 +194,6 @@ ggsave(
 # ============================================================
 Idents(Dun_seu) <- Dun_seu$seurat_clusters
 
-message("Finding markers ...")
 markers <- FindAllMarkers(
   object = Dun_seu,
   only.pos = TRUE,
