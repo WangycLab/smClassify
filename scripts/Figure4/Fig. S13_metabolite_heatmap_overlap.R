@@ -6,13 +6,12 @@
 # ============================================================
 # 1. Load packages
 # ============================================================
-suppressPackageStartupMessages({
-  library(tidyverse)
-  library(readxl)
-  library(limma)
-  library(pheatmap)
-  library(UpSetR)
-})
+
+library(tidyverse)
+library(readxl)
+library(limma)
+library(pheatmap)
+library(UpSetR)
 
 # ============================================================
 # 2. Input and output paths
@@ -220,12 +219,6 @@ mat_sig <- clean_matrix(mat_sig)
 mat_sig <- mat_sig[,rownames(ann_col)]
 
 colnames(mat_sig)
-colnames(mat_sig) <- colnames(mat_sig) %>%
-  gsub("^MC_", "Cecum_", .) %>%
-  gsub("^JC_", "Colon_", .) %>%
-  gsub("^ZC_", "Rectum_", .) %>%
-  gsub("WT8", "WT", .) %>%
-  gsub("DB8", "DB", .)
 
 pdf(file.path(output_dir,"Heatmap_SignificantMetabolites_T.pdf"),6,8)
 
@@ -265,4 +258,3 @@ UpSetR::upset(
 
 dev.off()
 
-cat("All analysis finished.\n")
