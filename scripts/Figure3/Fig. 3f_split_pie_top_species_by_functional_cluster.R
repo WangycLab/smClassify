@@ -3,15 +3,13 @@
 #
 # ============================================================
 
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(dplyr)
-  library(ggplot2)
-  library(ggforce)
-  library(tibble)
-  library(forcats)
-  library(scales)
-})
+library(Seurat)
+library(dplyr)
+library(ggplot2)
+library(ggforce)
+library(tibble)
+library(forcats)
+library(scales)
 
 set.seed(1234)
 
@@ -45,15 +43,10 @@ functional_cluster_levels <- c(
   "6_Polysaccharide degradation",
   "7_Oxidative stress response"
 )
-functional_cluster_levels <- functional_cluster_levels[
-  functional_cluster_levels %in% unique(seu$celltype)
-]
 
-if (length(functional_cluster_levels) > 0) {
-  seu$celltype <- factor(seu$celltype, levels = functional_cluster_levels)
-} else {
-  seu$celltype <- factor(seu$celltype)
-}
+functional_cluster_levels <- intersect(functional_cluster_levels, unique(seu$celltype))
+
+seu$celltype <- factor(seu$celltype, levels = functional_cluster_levels %||% levels(factor(seu$celltype)))
 
 Idents(seu) <- seu$celltype
 
