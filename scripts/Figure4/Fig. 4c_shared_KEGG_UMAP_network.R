@@ -6,15 +6,14 @@
 # ============================================================
 # 1. Load packages
 # ============================================================
-suppressPackageStartupMessages({
-  library(tidyverse)
-  library(Seurat)
-  library(igraph)
-  library(ggraph)
-  library(scales)
-  library(ggrepel)
-  library(viridis)
-})
+
+library(tidyverse)
+library(Seurat)
+library(igraph)
+library(ggraph)
+library(scales)
+library(ggrepel)
+library(viridis)
 
 library(dplyr)
 
