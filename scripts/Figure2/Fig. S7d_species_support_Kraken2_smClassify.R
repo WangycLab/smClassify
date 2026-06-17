@@ -7,16 +7,16 @@
 # 0. Load packages
 # ============================================================
 
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(Matrix)
-  library(data.table)
-  library(dplyr)
-  library(tidyr)
-  library(ggplot2)
-  library(stringr)
-  library(tibble)
-})
+
+library(Seurat)
+library(Matrix)
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(tibble)
+
 
 set.seed(1234)
 
@@ -29,7 +29,7 @@ input_dir  <- file.path(base_dir, "Input")
 output_dir <- file.path(base_dir, "Output")
 plot_dir   <- file.path(output_dir, "Fig_S7d_species_support_Kraken2_smClassify")
 
-kraken_report_dir <- "D:/BaiduSyncdisk/post-doc/T2DMmicrobiome/mouse_colon/20260319/smClassify-metagenome/Metagenome_kraken2/reports"
+kraken_report_dir <- "Metagenome_kraken2/reports"
 
 sce_file <- file.path(
   input_dir,
