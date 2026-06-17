@@ -4,11 +4,9 @@
 # ============================================================
 # 1. Load packages
 # ============================================================
-suppressPackageStartupMessages({
-  library(tidyverse)
-  library(Seurat)
-  library(ggplot2)
-})
+library(tidyverse)
+library(Seurat)
+library(ggplot2)
 
 # ============================================================
 # 2. Input and output paths
@@ -69,20 +67,12 @@ group_order <- c(
   "Rectum-WT", "Rectum-DB"
 )
 
-if (!"group" %in% colnames(seu@meta.data)) {
-  meta_cols <- colnames(seu@meta.data)
-  region_col <- meta_cols[tolower(meta_cols) %in% c("region", "tissue", "gut_region")][1]
-  phenotype_col <- meta_cols[tolower(meta_cols) %in% c("phenotype", "genotype", "treatment")][1]
-  
-  if (!is.na(region_col) && !is.na(phenotype_col)) {
-    seu$group <- paste0(seu@meta.data[[region_col]], "-", seu@meta.data[[phenotype_col]])
-  } else {
-    stop("The Seurat object must contain a 'group' column, or region and phenotype columns.")
-  }
-}
+seu$group <- paste0(
+  seu@meta.data[[region_col]], "-",
+  seu@meta.data[[phenotype_col]]
+)
 
-seu$group <- as.character(seu$group)
-seu$group <- factor(seu$group, levels = group_order)
+seu$group <- factor(as.character(seu$group), levels = group_order)
 
 write_csv(
   as.data.frame(table(seu$group)) %>%
@@ -142,9 +132,6 @@ write_csv(
 
 features_use <- intersect(fig4f_genes, rownames(seu))
 
-if (length(features_use) == 0) {
-  stop("None of the Figure 4f genes were found in the Seurat object.")
-}
 
 # ============================================================
 # 7. Generate Figure 4f DotPlot data
@@ -296,9 +283,6 @@ write_csv(
 
 fig4i_features_use <- intersect(fig4i_genes, rownames(seu))
 
-if (length(fig4i_features_use) == 0) {
-  stop("None of the Figure 4i bile acid metabolism genes were found in the Seurat object.")
-}
 
 p_fig4i_raw <- DotPlot(
   seu,
