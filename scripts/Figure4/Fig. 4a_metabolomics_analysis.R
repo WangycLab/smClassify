@@ -103,19 +103,14 @@ all_long <- bind_rows(serum_long, content_long)
 # ============================================================
 # 4. Parse sample metadata from sample names
 # ============================================================
+
 meta <- all_long %>%
   distinct(Sample) %>%
   mutate(
     Tissue_raw = str_extract(Sample, "^[A-Za-z]+"),
     Genotype   = str_extract(Sample, "(WT|DB)"),
     Rep        = as.integer(str_extract(Sample, "\\d{1,2}$")),
-    Tissue = case_when(
-      Tissue_raw %in% c("JC", "Colon")   ~ "Colon",
-      Tissue_raw %in% c("MC", "Cecum")   ~ "Cecum",
-      Tissue_raw %in% c("ZC", "Rectum")  ~ "Rectum",
-      Tissue_raw %in% c("Serum")         ~ "Serum",
-      TRUE ~ NA_character_
-    )
+    Tissue = Tissue_raw
   ) %>%
   filter(!str_detect(Sample, "^QC")) %>%
   filter(!is.na(Tissue), !is.na(Genotype)) %>%
@@ -209,7 +204,7 @@ p_pca_pheno <- ggplot(
   scale_fill_manual(values = pal_pheno) +
   scale_shape_manual(values = shape_region[c("Cecum", "Colon", "Rectum")]) +
   labs(
-    title = "PCA �? Gut Content (colored by phenotype)",
+    title = "PCA â€? Gut Content (colored by phenotype)",
     x = paste0("PC1 (", pc1_var, "%)"),
     y = paste0("PC2 (", pc2_var, "%)")
   ) +
@@ -235,7 +230,7 @@ p_pca_region <- ggplot(
   scale_fill_manual(values = pal_region[c("Cecum", "Colon", "Rectum")]) +
   scale_shape_manual(values = shape_pheno) +
   labs(
-    title = "PCA �? Gut Content (colored by region)",
+    title = "PCA â€? Gut Content (colored by region)",
     x = paste0("PC1 (", pc1_var, "%)"),
     y = paste0("PC2 (", pc2_var, "%)")
   ) +
@@ -261,7 +256,7 @@ p_pca_6g <- ggplot(
   scale_fill_manual(values = pal_pheno) +
   scale_shape_manual(values = shape_region[c("Cecum", "Colon", "Rectum")]) +
   labs(
-    title = "PCA �? Gut Content (Cecum / Colon / Rectum × WT / DB)",
+    title = "PCA â€? Gut Content (Cecum / Colon / Rectum Ã— WT / DB)",
     x = paste0("PC1 (", pc1_var, "%)"),
     y = paste0("PC2 (", pc2_var, "%)")
   ) +
@@ -316,7 +311,7 @@ p_pls_6g <- ggplot(
   scale_fill_manual(values = pal_pheno) +
   scale_shape_manual(values = shape_region[c("Cecum", "Colon", "Rectum")]) +
   labs(
-    title = "PLS-DA:Cecum/Colon/Rectum × WT/DB",
+    title = "PLS-DA:Cecum/Colon/Rectum Ã— WT/DB",
     x = "PLS-DA Component 1",
     y = "PLS-DA Component 2"
   ) +
