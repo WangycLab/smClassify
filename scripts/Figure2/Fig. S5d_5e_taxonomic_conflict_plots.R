@@ -3,17 +3,18 @@
 
 ############################################################
 
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(data.table)
-  library(dplyr)
-  library(tidyr)
-  library(ggplot2)
-  library(forcats)
-  library(scales)
-  library(tibble)
-  library(purrr)
-})
+
+library(Seurat)
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(forcats)
+library(scales)
+library(tibble)
+library(purrr)
+
+
 
 set.seed(1234)
 
@@ -33,9 +34,6 @@ plot_dir <- file.path(output_dir, "SupplementaryFigure5d_5e_taxonomic_conflict")
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 dir.create(plot_dir, showWarnings = FALSE, recursive = TRUE)
 
-if (!file.exists(taxonomy_rds)) {
-  stop("Input RDS not found: ", taxonomy_rds, call. = FALSE)
-}
 
 # ============================================================
 # 2. Read annotated Seurat object
@@ -45,22 +43,8 @@ sce_bac_annot <- readRDS(taxonomy_rds)
 meta <- sce_bac_annot@meta.data %>%
   rownames_to_column("cell")
 
-required_cols <- c(
-  "smClassify_genus", "MGBC_genus", "Refseq_genus", "MGnify_genus",
-  "smClassify_species", "MGBC_species", "Refseq_species", "MGnify_species"
-)
-
-missing_cols <- setdiff(required_cols, colnames(meta))
-if (length(missing_cols) > 0) {
-  stop(
-    "Missing required metadata columns: ",
-    paste(missing_cols, collapse = ", "),
-    call. = FALSE
-  )
-}
-
 # ============================================================
-# 3. Helper functions
+# 3. Functions
 # ============================================================
 
 .norm_taxon <- function(x) {
@@ -313,4 +297,3 @@ p_sfig5e <- ggplot(plot_top_pairs, aes(x = species_pair, y = fraction)) +
 
 save_plot(p_sfig5e, "SupplementaryFigure5e_top5_conflict_species_pairs", width = 16, height = 4)
 
-message("Supplementary Figure 5d-e outputs saved to: ", plot_dir)
