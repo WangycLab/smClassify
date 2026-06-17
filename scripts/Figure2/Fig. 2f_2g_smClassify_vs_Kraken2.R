@@ -6,15 +6,12 @@
 # ============================================================
 # 0. Load packages
 # ============================================================
-
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(dplyr)
-  library(tidyr)
-  library(ggplot2)
-  library(VennDiagram)
-  library(grid)
-})
+library(Seurat)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(VennDiagram)
+library(grid)
 
 set.seed(1234)
 
