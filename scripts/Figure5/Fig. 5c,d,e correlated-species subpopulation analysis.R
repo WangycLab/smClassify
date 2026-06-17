@@ -6,12 +6,11 @@
 # ============================================================
 # 1. Load packages
 # ============================================================
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(dplyr)
-  library(ggplot2)
-  library(scales)
-})
+
+library(Seurat)
+library(dplyr)
+library(ggplot2)
+library(scales)
 
 # ============================================================
 # 2. Input and output paths
