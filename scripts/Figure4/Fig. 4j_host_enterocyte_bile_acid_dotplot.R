@@ -6,11 +6,10 @@
 # ============================================================
 # 1. Load packages
 # ============================================================
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(ggplot2)
-  library(dplyr)
-})
+
+library(Seurat)
+library(ggplot2)
+library(dplyr)
 
 # ============================================================
 # 2. Input and output paths
@@ -110,10 +109,6 @@ write.csv(gene_check, gene_check_csv, row.names = FALSE)
 
 filtered_df <- gene_pathway_df %>%
   filter(gene %in% rownames(ent))
-
-if (nrow(filtered_df) == 0) {
-  stop("None of the Figure 4j genes were found in the enterocyte object.")
-}
 
 # ============================================================
 # 5. Generate DotPlot and source data
