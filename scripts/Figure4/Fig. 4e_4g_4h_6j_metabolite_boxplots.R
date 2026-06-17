@@ -2,11 +2,11 @@
 ## Figure 4e, 4g, 4h and Figure 6j metabolite boxplots
 ############################################################
 
-suppressPackageStartupMessages({
-  library(tidyverse)
-  library(readxl)
-  library(ggpubr)
-})
+library(tidyverse)
+library(readxl)
+library(ggpubr)
+
+
 
 # ======================================================
 # 0) Input and output paths
@@ -607,11 +607,7 @@ plot_each_feature_all8(
 
 # ======================================================
 # 11) Combined Source Data table with Welch's statistics
-#     Wide format:
-#     - One row per metabolite / ratio / metric
-#     - Sample values are separate columns
-#     - Feature is unique and used as row identifier
-#     - Other metadata and statistics are saved as columns
+
 # ======================================================
 
 all_source <- bind_rows(
