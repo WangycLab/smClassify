@@ -1,22 +1,19 @@
 ############################################################
-# Fig. 2j | Non-rRNA recovery after species assignment
+# Fig. 2j 
 ############################################################
 
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(Matrix)
-  library(dplyr)
-  library(ggplot2)
-  library(scales)
-  library(data.table)
-})
+library(Seurat)
+library(Matrix)
+library(dplyr)
+library(ggplot2)
+library(scales)
 
 # ============================================================
 # Input and output paths
 # ============================================================
 
-work_dir <- "D:/BaiduSyncdisk/post-doc/T2DMmicrobiome/mouse_colon/20251009"
-plot_dir <- "D:/BaiduSyncdisk/post-doc/T2DMmicrobiome/mouse_colon/Revision_3/Fig2j_smClassify_output_summary"
+work_dir <- "Figure2"
+plot_dir <- "Fig2j_smClassify_output_summary"
 
 dir.create(plot_dir, showWarnings = FALSE, recursive = TRUE)
 setwd(work_dir)
@@ -56,28 +53,16 @@ pal_pheno <- c(
   DB = "#E64B35"
 )
 
-# ============================================================
-# Prepare cell-level Fig. 2j source data
-# ============================================================
-# The object was generated after bacterial prefiltering and species assignment.
 
 meta_df <- sce_bac_annot@meta.data %>%
   as.data.frame()
 
-# Prefer the species-assignment non-rRNA UMI column generated in the main script.
 nonr_umi_col <- dplyr::case_when(
   "nonr_total" %in% colnames(meta_df) ~ "nonr_total",
   "nonr_umi"   %in% colnames(meta_df) ~ "nonr_umi",
   TRUE ~ NA_character_
 )
 
-if (is.na(nonr_umi_col)) {
-  stop("No non-rRNA UMI column was found. Expected 'nonr_total' or 'nonr_umi'.")
-}
-
-if (!"nonr_features" %in% colnames(meta_df)) {
-  stop("No detected non-rRNA gene column was found. Expected 'nonr_features'.")
-}
 
 sample_order <- c(
   "Cecum-WT-1",
@@ -116,8 +101,6 @@ fwrite(
   file = file.path(plot_dir, "Fig2j_nonrRNA_recovery_source_data.csv"),
   bom = TRUE
 )
-
-message("Fig. 2j cells retained: ", nrow(fig2j_qc))
 
 # ============================================================
 # Fig. 2j: non-rRNA UMI counts per cell
