@@ -1,27 +1,13 @@
 ############################################################
 ## Figure 4d amino-acid metabolite heatmap
-##
-## Purpose:
-##   This script reads serum and gut-content metabolomics intensity
-##   tables, extracts selected amino-acid-related metabolites, computes
-##   mean intensity for each tissue and phenotype group, applies
-##   row-wise z-score scaling, and exports the heatmap for Figure 4d.
-##
-## Notes:
-##   Amino acid list, grouping logic, z-score calculation, clustering,
-##   colours, plot dimensions and heatmap parameters are kept unchanged
-##   from the working analysis script.
-############################################################
 
 # ============================================================
 # 1. Load packages
 # ============================================================
-suppressPackageStartupMessages({
-  library(tidyverse)
-  library(readxl)
-  library(pheatmap)
-  library(ggpubr)
-})
+library(tidyverse)
+library(readxl)
+library(pheatmap)
+library(ggpubr)
 
 # ============================================================
 # 2. Input and output paths
