@@ -5,15 +5,15 @@
 # ============================================================
 # 1. Load packages
 # ============================================================
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(dplyr)
-  library(ggplot2)
-  library(data.table)
-  library(pheatmap)
-  library(reshape2)
-  library(stringr)
-})
+
+library(Seurat)
+library(dplyr)
+library(ggplot2)
+library(data.table)
+library(pheatmap)
+library(reshape2)
+library(stringr)
+
 
 # ============================================================
 # 2. Input and output paths
