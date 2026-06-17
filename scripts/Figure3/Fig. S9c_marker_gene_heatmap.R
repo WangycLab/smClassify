@@ -1,32 +1,23 @@
 # ============================================================
 # Supplementary Figure 9c marker-gene heatmap
-#
-# This script identifies cluster marker genes from the Figure 3
-# functional-cluster annotated Seurat object, annotates the top marker
-# genes using the GTF-derived gene annotation table, and plots the top
-# marker-gene expression heatmap across Seurat clusters.
-#
-# Repository use:
-#   Place input files in the Figure3/Input directory.
-#   All output tables and figures are written to Figure3/Output.
-# ============================================================
 
-suppressPackageStartupMessages({
-  library(data.table)
-  library(Seurat)
-  library(dplyr)
-  library(tibble)
-  library(ComplexHeatmap)
-  library(circlize)
-  library(grid)
-  library(RColorBrewer)
-})
+# =================
+
+
+library(data.table)
+library(Seurat)
+library(dplyr)
+library(tibble)
+library(ComplexHeatmap)
+library(circlize)
+library(grid)
+library(RColorBrewer)
 
 set.seed(1234)
 
 # ============================================================
 # Input and output paths
-# ============================================================
+# ======================================
 base_dir   <- "Figure3"
 input_dir  <- file.path(base_dir, "Input")
 output_dir <- file.path(base_dir, "Output")
