@@ -5,16 +5,16 @@
 
 # =========================================================
 
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(dplyr)
-  library(tidyr)
-  library(readr)
-  library(ggplot2)
-  library(stringr)
-  library(forcats)
-  library(scales)
-})
+library(Seurat)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(ggplot2)
+library(stringr)
+library(forcats)
+library(scales)
+
+
 
 # =========================================================
 # 0. paths
