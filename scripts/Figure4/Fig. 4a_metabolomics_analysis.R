@@ -5,20 +5,19 @@
 # 0. Load packages
 # ============================================================
 
-suppressPackageStartupMessages({
-  library(tidyverse)
-  library(readxl)
-  library(limma)
-  library(factoextra)
-  library(pheatmap)
-  library(ggrepel)
-  library(glue)
-  library(viridis)
-  library(ropls)
-  library(UpSetR)
-  library(ComplexHeatmap)
-  library(RColorBrewer)
-})
+library(tidyverse)
+library(readxl)
+library(limma)
+library(factoextra)
+library(pheatmap)
+library(ggrepel)
+library(glue)
+library(viridis)
+library(ropls)
+library(UpSetR)
+library(ComplexHeatmap)
+library(RColorBrewer)
+
 
 # ============================================================
 # 1. Input files and output directory
