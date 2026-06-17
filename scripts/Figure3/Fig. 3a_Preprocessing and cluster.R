@@ -1,27 +1,25 @@
 # ============================================================
-# Figure 3a preprocessing, UMAP visualization, and
-# cluster-composition analysis
+# Figure 3a preprocessing, UMAP visualization, and cluster-composition analysis
 
 # ============================================================
 
-suppressPackageStartupMessages({
-  library(data.table)
-  library(Matrix)
-  library(Seurat)
-  library(dplyr)
-  library(future)
-  library(tibble)
-  library(paletteer)
-  library(ComplexHeatmap)
-  library(circlize)
-  library(grid)             
-  library(RColorBrewer)  
-  library(dplyr)
-  library(tibble)
-  library(ggplot2)
-  library(Seurat)
-  library(scales)     
-})
+library(data.table)
+library(Matrix)
+library(Seurat)
+library(dplyr)
+library(future)
+library(tibble)
+library(paletteer)
+library(ComplexHeatmap)
+library(circlize)
+library(grid)             
+library(RColorBrewer)  
+library(dplyr)
+library(tibble)
+library(ggplot2)
+library(Seurat)
+library(scales)     
+
 
 # ============================================================
 # 1. Input and output paths
