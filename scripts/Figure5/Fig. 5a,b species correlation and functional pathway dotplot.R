@@ -7,16 +7,15 @@
 # ============================================================
 # 1. Load packages
 # ============================================================
-suppressPackageStartupMessages({
-  library(Seurat)
-  library(dplyr)
-  library(tidyr)
-  library(ggplot2)
-  library(pheatmap)
-  library(Matrix)
-  library(scales)
-  library(grid)
-})
+library(Seurat)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(pheatmap)
+library(Matrix)
+library(scales)
+library(grid)
+
 
 # ============================================================
 # 2. Input and output paths
