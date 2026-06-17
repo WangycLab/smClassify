@@ -3,6 +3,7 @@
 
 # ============================================================
 
+
 library(data.table)
 library(Matrix)
 library(Seurat)
@@ -18,7 +19,7 @@ library(dplyr)
 library(tibble)
 library(ggplot2)
 library(Seurat)
-library(scales)     
+library(scales)   
 
 
 # ============================================================
@@ -98,7 +99,7 @@ fast_rowsum_by_group <- function(M, gvec, min_total = 1L, verbose = TRUE){
   out <- G %*% M2
   rownames(out) <- levels(f)
   if (verbose) {
-    message(sprintf("Grouped sum done: %d groups × %d cells; nnz=%d",
+    message(sprintf("Grouped sum done: %d groups 脳 %d cells; nnz=%d",
                     nrow(out), ncol(out), Matrix::nnzero(out)))
   }
   out
