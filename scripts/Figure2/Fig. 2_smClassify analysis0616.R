@@ -3,16 +3,14 @@
 
 # ============================================================
 
-suppressPackageStartupMessages({
-  library(data.table)
-  library(Seurat)
-  library(Matrix)
-  library(dplyr)
-  library(ggplot2)
-  library(forcats)
-  library(scales)
-  library(tidyr)
-})
+library(data.table)
+library(Seurat)
+library(Matrix)
+library(dplyr)
+library(ggplot2)
+library(forcats)
+library(scales)
+library(tidyr)
 
 # ============================================================
 base_dir   <- "Figure2"
